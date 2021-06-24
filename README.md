@@ -1,1 +1,1 @@
-# Updated with plugin + newContent
+# Updated with plugin# EMPTY CONTENT
