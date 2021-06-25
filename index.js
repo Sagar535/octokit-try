@@ -20,17 +20,35 @@ async function run() {
 
 	console.log("######### GETTING README ##########")
 	const {content, sha} = await getReadme()
-	console.log("##########GOT README###########")	
-	console.log("########## UPDDATING README #######")
+	console.log("##########GOT README###########")
+	console.log(content)
+	// console.log("########## UPDDATING README #######")
 
-	await updateReadme(command + '\n' +newContent, sha)
+	// await updateReadme(command + '\n' +newContent, sha)
 
-	console.log("CHECK in remote repo, it should be updated....")
+	// console.log("CHECK in remote repo, it should be updated....")
+	const response = await getReference()
+	console.log(response.data)
+	console.log(response.data.object.sha)
+
+	console.log("%%%%%%%%% Creating ref %%%%%%%%")
+	const res = await createReferecne(response.data.object.sha, 'some-topic')
+
+	console.log(res.response.data)
+
+	const branchExists = await exists('some-topic')
+	console.log(branchExists)
 }
 
 run();
 
-async function getReadme() {
+// check if branch already exists
+async function exists(branch_name) {
+	const response = getReference(branch_name)
+	return response
+}
+
+async function getReadme(ref='master') {
 	// get the README
 	const { data: readme } = await octokit.request(
 	  'GET /repos/{owner}/{repo}/contents/{path}',
@@ -38,6 +56,7 @@ async function getReadme() {
 	    owner: user,
 	    repo: repo,
 	    path: 'README.md',
+	    ref: ref
 	  },
 	);
 
@@ -58,4 +77,39 @@ async function updateReadme(new_content, sha) {
 	    sha: sha,
 	  },
 	);
+}
+
+async function getReference(ref='master') {
+	const response = await octokit.request('GET /repos/{owner}/{repo}/git/ref/{ref}', {
+						  owner: user,
+						  repo: repo,
+						  ref: 'heads/' + ref
+						}).catch(err => console.log(err))
+
+	return response
+}
+
+async function createReferecne(sha, branch_name) {
+	try {
+		const response = await octokit.request('POST /repos/{owner}/{repo}/git/refs', {
+							owner: user,
+							repo: repo,
+							ref: 'refs/heads/' + branch_name,
+							sha: sha
+						})
+
+		return response
+	} catch(e) {
+		if (e.status == 422 && e.message == 'Reference already exists') {
+			const response = await getReference('some-topic')
+			console.log(response)
+			console.log(response.data)
+			console.log(response.data.object.sha)
+
+			return { status: 422, message: 'Reference already exists', response: response }
+		} else {
+			console.log(e.status)
+			return e.message
+		}
+	}
 }
